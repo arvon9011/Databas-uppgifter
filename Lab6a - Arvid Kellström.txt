@@ -1,0 +1,238 @@
+
+/*Uppgift 1 - Skapa databas*/
+CREATE TABLE author (id int not null auto_increment, username varchar(20) not null, name varchar (30), primary key (username), UNIQUE (id));
+CREATE TABLE  post (id int not null auto_increment, subject varchar (50), content varchar(255),  posted datetime, last_edit datetime, post_author varchar(20), primary key (id), foreign key (post_author) references author (username) ON DELETE CASCADE );
+CREATE TABLE  comment (id int not null auto_increment, name varchar(30), subject varchar (50), content varchar(255),  posted datetime, poster_id int, primary key (id), foreign key (poster_id) references post (id) ON DELETE CASCADE);
+CREATE TABLE category  (id int not null auto_increment, name varchar(30), primary key (name),UNIQUE (id));
+CREATE TABLE post_category (id int not null auto_increment, post_id int, category_id int,primary key (id), foreign key(post_id) references post(id), foreign key(category_id) references category(id) ON DELETE CASCADE );
+
+
+/*Uppgift 2 - Skapa prodcedures för att lägga till innehåll
+ange lämpliga parametrar. Du ska implementera procedurer för att:*/
+
+
+/*2.1 - Lägga till en skribent.*/
+drop procedure if exists add_author;
+
+delimiter //
+create procedure add_author(user_name varchar(20), real_name varchar (30))
+begin
+	Insert into author (username, name) values (user_name, real_name);
+end //
+delimiter ;
+
+/*2.2 - Lägga till en kategori.*/
+drop procedure if exists add_category;
+
+delimiter //
+create procedure add_category(category_name varchar(30))
+begin
+	Insert into category (name) values (category_name);
+end //
+delimiter ;
+
+/*2.3 - Lägga till en bloggpost med rubrik, datum och innehåll för en viss skribent.*/
+drop procedure if exists add_post;
+
+delimiter //
+create procedure add_post(post_subject varchar (50), post_content varchar(255),  post_posted datetime, author varchar(20))
+begin
+	Insert into post (subject, content, posted, post_author) values (post_subject, post_content, post_posted, author);
+end //
+delimiter  ;
+
+/*2.4 - Koppla ihop en bloggpost med en kategori*/
+drop procedure if exists add_post_category;
+delimiter //
+create procedure add_post_category(post_id int, category_id int)
+begin
+	Insert into post_category (post_id, category_id) values (post_id, category_id);
+end //
+delimiter  ;
+
+/*2.5 - Kommentar*/
+drop procedure if exists add_comment;
+delimiter //
+create procedure add_comment(c_name varchar(30), c_subject varchar (50), c_content varchar(255), c_posted datetime, p_id int)
+begin
+	Insert into comment (name, subject, content, posted, poster_id) values (c_name, c_subject, c_content, c_posted, p_id);
+end //
+delimiter  ;
+
+
+/*Uppgift 3 -  Skapa innehåll*/
+call add_author("ApanArvid", "Arvid");
+call add_author("snogubben", "Simon");
+call add_author("Brollan", "Bengt");
+call add_author("cockapoo_power", "Lisa");
+call add_author("LoserLukas", "Lukas");
+
+call add_post("Den sötaste hundarna i världen!", "Min hund är den sötaste hunden i världen, inte din hund", now(), "ApanArvid");
+call add_post("Cheeseburger st.", " macaroni cheese when the cheese comes out everybody's happy cut the cheese stilton boursin chalk and cheese stilton.", now(), "snogubben");
+call add_post("Cottage cheese ", " Queso red leicester airedale caerphilly ricotta smelly cheese stinking bishop monterey jack. ", now(), "snogubben");
+call add_post("Cut the cheese", "Blue castello stilton camembert de normandie when the cheese comes out everybody's happy", now(), "Brollan");
+call add_post("Bocconcini goat", "Rubber cheese everyone loves cheese strings", now(), "Brollan");
+call add_post("Cheesy feet", "auliflower cheese cheese and wine macaroni cheese", now(), "cockapoo_power");
+call add_post("Major League 3?", "I don't know. I haven't read it. I don't care.", now(), "cockapoo_power");
+call add_post("But like in baseball", "the scoreboard doesn't lie", now(), "cockapoo_power");
+call add_post("Lorem ipsum dolor sit amet", "emi beard casual style super mario leader of men,", now(), "ApanArvid");
+call add_post("Driving gloves", "graeme souness mr frothy-top old man in pub?", now(), "ApanArvid");
+
+
+call add_category("sci-fi");
+call add_category("Knas");
+call add_category("Komedi");
+call add_category("Övrigt");
+call add_category("Livsstil");
+call add_category("Tech");
+call add_category("Spel");
+call add_category("Musik");
+call add_category("Tv");
+call add_category("Hemmet");
+
+call add_post_category(1,1);
+call add_post_category(2,4);
+call add_post_category(1,4);
+call add_post_category(4,10);
+call add_post_category(5,8);
+call add_post_category(6,4);
+call add_post_category(7,7);
+call add_post_category(8,9);
+call add_post_category(9,1);
+call add_post_category(10,1);
+
+
+call add_comment("Hundmannen", "Nej!!!!", "Min hund faktiskt bättre", now(), 1);
+call add_comment("Lökenlars", "Wow!", "roligt inlägg", now(), 4);
+call add_comment("Mikkemus", "Bacon ipsum dolor ", "Tenderloin doner venison, chuck bresaola beef ribs pastrami spare ribs ", now(), 4);
+call add_comment("LukkeLove", "strip steak cow", "ribs chicken shankle pig shoulder ham", now(), 6);
+call add_comment("ErikEvil", "tenderloin short ribs strip ", "Venison sausage fatback", now(), 6);
+call add_comment("GustavGod", "ilet mignon pork", "Does your lorem ipsum text", now(), 8);
+call add_comment("VeryViktor", "bacon", "erky porchetta filet mignon chuck", now(), 8);
+call add_comment("Diva", "meatloaf ", "meatloaf boudin prosciutto", now(), 2);
+call add_comment("Knasigakalle", "biltong ", "Jerky pastrami boudin", now(), 1);
+call add_comment("FalskaFrank", "Chicken kevin ", "n brisket capicola buffalo", now(), 10);
+call add_post("Vad är det här så knas", "finns det inga inlägg på denhär sidan", "2020-11-11", "ApanArvid");
+call add_post("Alla undrar", "Alla undrar jo är det berryblue eller tandkräm? nej, det är BÄRMIX!", now(), "ApanArvid");
+
+
+/*uppgift 4 - Ta bort kategori*/ 
+
+drop procedure if exists remove_category;
+delimiter //
+create procedure remove_category(c_id int)
+begin
+	DELETE FROM category WHERE id = c_id;
+end //
+delimiter  ;
+
+call remove_category(7);
+
+select * from category;
+select * from post_category;
+
+
+/*uppgift 5 - Visa alla kommentarer*/ 
+drop procedure if exists show_comments;
+delimiter //
+create procedure show_comments(p_id int)
+begin
+	select * from comment where poster_id = p_id;
+end //
+delimiter  ;
+
+call show_comments(8);
+
+/*uppgift 6 - Visa aktivitetsnivå*/ 
+
+drop procedure if exists activity_level;
+
+delimiter //
+create procedure activity_level()
+begin
+
+
+select username,if(count(post_author) > 0 and count(post_author) < 3, "low", 
+    if(count(post_author) > 2 and count(post_author) < 6, "medium", 
+    if(count(post_author) > 5, "high",
+    "no activity"))) as activity_level
+    from author
+   left outer join post on username = post_author
+    group by username;
+
+end//
+delimiter ;
+select * from author;
+call activity_level();
+
+
+
+/*uppgift 7 - no_of_comments(post_id) */ 
+
+drop function if exists no_of_comments;
+
+delimiter //
+create function no_of_comments(post_id int)
+returns int DETERMINISTIC
+
+begin
+
+declare NbrOfTimes int;
+	select count(*) from comment where poster_id = post_id into NbrOfTimes;
+    
+    return NbrOfTimes;
+end //
+delimiter ;
+
+select no_of_comments(1);
+
+/*uppgift 8 - no_of_categories(post_id)*/ 
+drop function if exists no_of_categories;
+
+delimiter //
+create function no_of_categories(id int)
+returns int DETERMINISTIC
+
+begin
+declare NbrOfTimes int;
+	select count(*) from post_category where id = post_id into NbrOfTimes;
+    
+    return NbrOfTimes;
+end //
+delimiter ;
+
+select no_of_categories(1);
+
+
+/*uppgift 9 - time_since_posting(datetime)*/ 
+
+drop function if exists time_since_posting;
+
+delimiter //
+create function time_since_posting(thetime datetime)
+returns text deterministic
+
+begin
+declare diff int;
+declare returntext text;
+declare daydiff int;
+
+set diff = timestampdiff(hour,thetime, now());
+set daydiff = diff/24;
+set returntext = case when diff < 1 then "new"
+when diff > 1 and  diff < 24 then "less than 1 day"
+else concat(daydiff, " days") end;
+
+return returntext; 
+end //
+delimiter ;
+
+select subject, content, time_since_posting(posted) from post;
+
+/*uppgift 10 - all_posts*/ 
+drop view if exists all_posts;
+
+create view all_posts as select author.username, post.id, subject, time_since_posting(posted) as time_status, no_of_comments(post.id) as comments, no_of_categories(post.id) as categories from post
+join author on author.username = post_author;
+
+select * from  all_posts;

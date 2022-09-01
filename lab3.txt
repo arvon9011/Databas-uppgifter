@@ -1,0 +1,174 @@
+ERIK SJÖSTEDT, ARVID KELLSTRÖM
+
+
+/*UPPGIFT 1
+Veckodagar
+a) Skriv en query som visar vilken veckodag det kommer vara på den sista dagen nuvarande månad.
+b) Skriv en query som visar vilken veckodag det kommer vara på den första dagen nästa månad.
+*/
+
+/* a) */
+select dayname(last_day(now())) as last_day;
+
+/* b) */
+select dayname(date_add(date_add(last_day(now()),interval 1 day),interval 1 month)) as first_day;
+
+
+/*UPPGIFT 2
+Dagar sen terminsstart HT-19
+Skriv en query som visar hur många dagar det gått sen 2019-09-02. (Terminsstart UU-HT-19.)
+*/
+
+select datediff(now(), "2019-09-02");
+
+/*UPPGIFT 3
+midnight_countdown()
+Skriv en procedure som när den anropas visar hur många minuter det är kvar till midnatt.
+*/
+drop procedure if exists midnight_countdown;
+
+delimiter //
+create procedure midnight_countdown()
+begin
+	SELECT TIMESTAMPDIFF(minute, now(), curdate()+1);
+end//
+delimiter ;
+
+call midnight_countdown();
+
+
+/*UPPGIFT 4
+born_in_february
+Skapa en vy som visar alla users som är födda i februari.
+*/
+drop view if exists born_in_february;
+
+create view born_in_february as
+select username from users
+where extract(month from birthdate) = "02";
+
+select * from born_in_february;
+
+
+/*UPPGIFT 5
+happy_birthday(month, day)
+Skriv en procedure som visar förnamn och efternamn på alla users som har födelsedag på given månad och dag.
+*/
+drop procedure if exists happy_birthday;
+
+delimiter //
+create procedure happy_birthday(in birthmonth text,in birthday text)
+begin
+	select first_name, last_name
+    from users
+    where extract(month from birthdate) = birthmonth and
+    extract(day from birthdate) = birthday;
+end//
+
+call happy_birthday("09", "11");
+
+/*UPPGIFT 6
+age(birthdate)
+För users gör en funktion som räknar ut ålder utifrån ett födelsedatum. 
+Ska kunna användas med t ex SELECT first_name, last_name, birthdate, age(birthdate) FROM users ORDER BY birthdate DESC;
+*/
+
+demiliter //
+create function age(birthdate date)
+returns int deterministic
+begin
+	declare userage int;
+	set userage = timestampdiff(year, birthdate, curdate());
+	return userage;
+end//
+delimiter ;
+
+SELECT first_name, last_name, birthdate, age(birthdate) FROM users ORDER BY birthdate ASC;
+
+/*UPPGIFT 7
+time_trigger
+För users skriv triggers så att det inte går att lägga in, eller ändra till födelsedatum som ligger framåt i tiden.
+*/
+
+drop trigger if exists time_trigger_insert;
+
+delimiter //
+create trigger time_trigger_insert before insert on users
+for each row
+begin
+	if new.birthdate > curdate() then 
+		signal sqlstate '45000' set message_text = 'You were not born in the future!';
+	end if;
+end//
+delimiter ;
+
+drop trigger if exists time_trigger_update;
+
+delimiter //
+create trigger time_trigger_update before update on users
+for each row
+begin
+	if new.birthdate > curdate() then 
+		signal sqlstate '45000' set message_text = 'You were not born in the future!';
+	end if;
+end//
+delimiter ;
+
+insert into users (username, first_name, last_name, email, pass, birthdate) values ('monkeyman99', 'Arvid', 'Kellström', 'iloveapes@monkey.com', '05242e4b4ddcafa9b6346dcec7e6bccb6733eacf', '2029-04-02');
+
+update users set birthdate = '2029-04-02' where id = 1;
+select * from users where id = 1;
+
+/*UPPGIFT 8
+orders_sent_but_not_recieved
+För orders skapa en vy som visar order-id för alla orders som är skickade men inte mottagna av kund. 
+I vyn ska finnas en kolumn, time_in_transit, som visar hur många timmar och minuter som gått sen ordern skickades.
+*/
+drop view if exists orders_sent_but_not_recieved;
+
+create view orders_sent_but_not_recieved as
+select time_format(abs(timediff(sent_from_store, now())),'%H:%i')
+from orders as time_in_transit
+where arrived_at_customer is null and sent_from_store is not null;
+
+select * from orders_sent_but_not_recieved;
+
+/*UPPGIFT 9
+fastest_delivery
+För orders skapa en vy som visar de 5 orders som det var kortast tid mellan att de skickades tills att de kom fram till kund. Sortera på tid i stigande ordning. Kortast tid övers.
+*/
+drop view if exists fastest_delivery;
+
+create view fastest_delivery as
+select arrived_at_customer, timediff(arrived_at_customer, sent_from_store) as delivery_time
+from orders 
+where arrived_at_customer is not null and sent_from_store is not null
+order by delivery_time asc limit 5;
+
+select * from fastest_delivery;
+
+/*UPPGIFT 10
+order_status()
+För orders skapa en procedure som visar order-id, och en kolumn för "Status" där det står:
+"Processing" för de orders som är mottagna men inte är skickade
+"Sent" för de som är skickade men ej kommit fram till kund där det inte gått mer än 14 dagar
+"Lost?" för de som är skickade men ej kommit fram till kund och där det gått mer än 14 dagar
+"Fast" för de som kommit fram till kund inom 120 h
+"Slow" för de som kommit fram med mer än 120 h i frakttid.
+*/
+
+drop procedure if exists order_status;
+
+delimiter //
+create procedure order_status()
+begin
+	select id, if(received_at_store is not null and sent_from_store is null, "Processing", 
+    if(sent_from_store is not null and arrived_at_customer is null and datediff(now(), sent_from_store) < 14, "Sent", 
+    if(sent_from_store is not null and arrived_at_customer is null and datediff(now(), sent_from_store) > 14, "Lost?",
+    if(sent_from_store is not null and arrived_at_customer is not null and timestampdiff(hour, sent_from_store, arrived_at_customer) < 120, "Fast",
+    if(sent_from_store is not null and arrived_at_customer is not null and timestampdiff(hour, sent_from_store, arrived_at_customer) > 120, "Slow", "Unknown"))))) as order_status
+    from orders;
+end//
+delimiter ;
+
+call order_status();

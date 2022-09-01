@@ -1,0 +1,254 @@
+/*UPPGIFT 1
+Foreign keys
+Skriv queries (ALTER TABLE) för koppla ihop tabellerna med foreign_keys och ta med lämpliga val för vad som ska hända vid updates och deletes på PK:
+departments-mangager till employees-id,
+project-supervisor till employees-id
+projectmembers-e_id till employees-id
+projectmembers-p_id till projects-id
+*/
+
+alter table departments 
+add foreign key (manager) references employees(id)
+on delete cascade;
+
+alter table projects 
+add foreign key (supervisor) references employees(id)
+on delete cascade;
+
+alter table project_members 
+add foreign key (e_id) references employees(id)
+on update cascade;
+
+alter table project_members 
+add foreign key (p_id) references projects(id)
+on update cascade;
+
+/*UPPGIFT 2
+Projects
+Skriv queries så att projects ändras (ALTER TABLE) så att varje project alltid har en supervisor, 
+så att två projektnamn inte kan vara samma, och så att det alltid måste finnas ett projektnamn.
+*/
+
+alter table projects
+modify supervisor int not null;
+
+alter table projects
+add unique (name);
+
+alter table projects
+modify name varchar(50) not null;
+
+
+/*UPPGIFT 3
+Departments
+Ändra i DB så att alla anställda alltid är knutna till en avdelning. 
+Ändra så att default för nya anställda och för anställda utan dept ska vara "Training". Det ska inte kunna finnas anställda utan avdelningar. 
+Lägg också in att deparments måste ha ett namn och det namnet måste vara unikt samt att varje department måste ha en manager.
+*/
+
+alter table departments
+alter department set default 'Training';
+
+alter table employees
+modify department int not null;
+
+alter table departments
+add unique (department);
+
+alter table departments
+modify manager int not null;
+
+/*UPPGIFT 4
+​Employees
+Vi (eller kund) vet att det kommer göras många sökningar och sorteringar på efternamn. Lägg därför in INDEX där. 
+Användarnamn (login) måste också spärras så inte två kan få samma.
+*/
+
+create index idx_lastname
+on employees (last_name);
+
+alter table employees
+add unique (login);
+
+/*UPPGIFT 5
+Optimera datatyper
+Skriv queries som ändrar (ALTER TABLE)  ett par av datatyperna till något som är effektivare:
+*/
+/* a) */
+alter table projects
+modify column name varchar(20);
+/* b) */
+alter table departments
+modify column id tinyint;
+/* c) */
+alter table employees
+modify column title enum('dr', 'mr', 'ms', 'mrs', 'rev', 'honorable');
+/* d) */
+alter table employees
+add unique (login), 
+modify first_name varchar(50) not null,
+modify last_name varchar(50) not null,
+modify login varchar(50) not null;
+/* e) */
+alter table employees
+modify email varchar(50) not null;
+
+alter table employees
+add unique (email);
+
+insert into employees (title, first_name, last_name, login, department, birth_date, email, salary, phone_work, start_date, phone_home, phone_mobile, hr_notes) values ('Honorable', 'Rubina', 'Mingame', 'apa123', 4, '1973-05-23', 'rmingamelb@ocn.ne.jp', 39295, '303-44-6700', '2007-10-04', '251-31-1663', '354-33-4423', 'hehe hoho');
+ 
+ /*UPPGIFT 6
+ Skapa vy: salary_data_dept
+ Skapa en vy som ger avdelningsnamn, minsta lön, högsta lön, medellön och antal anställda för varje avdelning.
+*/
+
+drop view if exists salary_data_dept;
+
+create view salary_data_dept as
+select departments.department, max(employees.salary), min(employees.salary), avg(employees.salary), count(employees.id)
+from departments
+join employees on departments.id = employees.department
+group by department;
+
+select * from salary_data_dept;
+
+/*UPPGIFT 7
+Skapa funktion och vy: retirement_status
+Skapa en funktion som utifrån födelsedatum ger svaren "more than 5 years" för de som har mer än 5 (hela) år kvar tills de fyller 65, 
+för de som har mellan 5 och 1 år svarar funktionen hur många år det är kvar  ex "3 years left", för de som fyller detta år men ännu inte fyllt svarar funktionen 
+"Up for retirement" och för de som är äldre än 65 så svarar funktionen "Retired".
+Skapa sedan en vy som listar anställda med titel, förnamn, efternamn, ålder, födelsedag och avdelning de jobbar på samt deras retirement_status. 
+Sortera på avdelning och sedan födelsedatum. Visa bara de som är 55 år eller äldre.
+*/
+drop function if exists retirement_status;
+
+delimiter //
+create function retirement_status(birthdate date)
+returns varchar(50) deterministic
+begin
+	declare return_text varchar(50);
+    declare yeardiff int; 
+    set yeardiff = 65 - timestampdiff(year, birthdate, now());
+     case
+		when yeardiff > 5
+			then set return_text = "more than 5 years";
+		when yeardiff <= 5 and yeardiff > 1
+			then set return_text = concat(yeardiff, " years left");
+		when yeardiff <= 1 and yeardiff > 0
+			then set return_text = "Up for retirement";
+		when yeardiff < 0
+			then set return_text = "Retired";
+		return return_text;
+		end case;
+end //
+delimiter ;
+
+drop view if exists employee_overview;
+
+create view employee_overview as
+select title, first_name, last_name, timestampdiff(year, birth_date, now()), birth_date, departments.department, retirement_status(birth_date)
+from employees
+join departments on departments.id = employees.department
+where (timestampdiff(year, birth_date, now()) >= 55);
+
+select * from employee_overview;    
+
+/*UPPGIFT 8
+Skapa tabell: total_salary
+Skapa en tabell för summan av löner, lägg in nuvarande värde (gör SELECT SUM(salary)...) 
+och lägg till triggers på anställdas löner så att summan av löner alltid stämmer i nya tabellen. 
+Tabellen ska också ha ett fält för last_update som visar när den senast uppdaterades. 
+Testa och visa med några UPDATE och INSERT av anställda att det fungerar. (Detta skulle kunna spara resurser för DB om vi har många anställda och ofta ställer 
+frågor kring summan av löner. Med detta upplägg så behöver vi inte göra den potentiellt tunga summeringen av alla löner utan det räcker med att göra en enkel uppslagning i 
+den alltid uppdaterade total_salary.)
+*/
+
+create table total_salary (salary int, last_update date);
+insert into total_salary (salary) values (39366201);
+
+drop trigger if exists salary_update;
+
+delimiter //
+create trigger salary_update
+before update on employees for each row
+begin
+	declare new_employee_salary int;
+    declare old_total int;
+    select salary into old_total from total_salary;
+    set new_employee_salary = new.salary - old.salary;
+    update total_salary set salary = old_total + new_employee_salary, last_update = now();
+end //
+delimiter ;
+
+drop trigger if exists salary_insert;
+
+delimiter //
+create trigger salary_insert
+before insert on employees for each row
+begin
+	declare new_employee_salary int;
+    declare old_total int;
+    select salary into old_total from total_salary;
+    set new_employee_salary = new.salary;
+    update total_salary set salary = old_total + new_employee_salary, last_update = now();
+end //
+delimiter ;
+
+select * from total_salary;
+
+update employees
+set salary = 133769420
+where id = 1;
+
+insert into employees (title, first_name, last_name, login, department, birth_date, email, salary, phone_work, start_date, phone_home, phone_mobile) values ('Ms', 'Fidel', 'Gooderridge', 'iloveass6p55es11', 12, '1982-08-11', 'ap4gg4a@m6onkey.com', 1, '541-31-4579', '2003-04-20', '593-62-3382', '886-52-4011');
+
+
+/*UPPGIFT 9
+Flytta hr_notes
+a) Skriv queries för att skapa en tabell och flytta allt innehåll i hr_notes till den nya tabellen samt koppla den 
+nya tabellen till employees-id med foreign keys. Ta sedan bort kolumnen för hr_notes från employees. 
+(Spara era queries för redovisningen. Det räcker inte att visa nya tabellerna utan det krävs att ni redovisar vilka queries som behöver köras för att skapa dem.)
+b) Skriv query som visar efternamn, förnamn, hr_notes för alla anställda utifrån den nya tabellen.
+*/
+
+create table hr_notes (notes text, e_id int);
+alter table hr_notes 
+add foreign key (e_id) references employees(id);
+
+insert into hr_notes (e_id, notes) select id, hr_notes from employees;
+select * from hr_notes;
+
+alter table employees
+drop column hr_notes;
+
+select first_name, last_name, hr_notes.notes from employees
+join hr_notes on hr_notes.e_id = employees.id;
+
+
+/*UPPGIFT 10
+Begränsa löneändringar
+Skriv kod för trigger som gör att löner begränsas så att det inte går att sänka lönen för en anställd och inte går att höja med mer än 10%.
+*/
+drop trigger if exists salary_raise;
+
+delimiter //
+create trigger salary_raise
+before update on employees for each row
+begin
+	if(new.salary > old.salary*1.10) 
+		then signal sqlstate '45000' set message_text = 'Thats too much';
+	end if;
+	if(new.salary < old.salary*0.90)
+		then signal sqlstate '45000' set message_text = 'Thats too low';
+	end if;
+end //
+delimiter ;
+
+update employees
+set salary = 100
+where id = 2;
+
+update employees
+set salary = 999999
+where id = 2;

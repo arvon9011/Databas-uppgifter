@@ -1,0 +1,202 @@
+/*UPPGIFT 1
+all_users
+Skapa en vy med en kolumn för username och en kolumn med number_of_friends där det är uträknat hur många vänner de har. Ska kunna köras med SELECT * FROM all_users.
+*/
+drop view if exists all_users;
+
+create view all_users as
+select username, count(u_id) as number_of_friends from users
+join friends on friends.u_id = users.id
+group by username
+order by number_of_friends;
+
+select * from all_users;
+
+/*UPPGIFT 2
+friends_list
+Skapa en vy med användarnamn (username) och namnen på deras kompisar. Ska t ex gå att göra SELECT friendname FROM friends_list WHERE username = "arya" för att få ut lista med vänner till Arya.
+*/
+drop view if exists friends_list;
+
+create view friends_list as
+select a.username as userdude, b.username as friendname from friends
+join users a on friends.u_id = a.id
+join users b on friends.f_id = b.id;
+
+select friendname from friends_list where userdude="sansa";
+
+/*UPPGIFT 3
+user_email()
+Skapa en procedure så att call user_email(); ger en lista med epost, fname och lname för alla användare i DB.
+*/
+drop procedure if exists user_email;
+
+delimiter //
+create procedure user_email()
+begin
+	select email, fname, lname from users;
+end //
+delimiter ;
+
+call user_email();
+
+/*UPPGIFT 4
+add_hobby(hobby)
+Skapa en procedure som lägger till en hobby i tabellen hobbies.
+*/
+drop procedure if exists add_hobby;
+
+delimiter //
+create procedure add_hobby(IN h TEXT)
+begin
+	insert into hobbies (name) values (h);
+    select last_insert_id();
+end //
+delimiter ;
+
+call add_hobby("Skiing");
+
+select * from hobbies;
+
+/*UPPGIFT 5
+add_user(username, pass, fname, lname, email, age)
+Skapa en procedure som lägger till en user. För alla nya användare som läggs till ska även läggas till en koppling så att de får hobbyn "Swords".
+*/
+drop procedure if exists add_user;
+
+delimiter //
+create procedure add_user(in u text,in p text, in f text, in l text, in e text, in a int)
+begin
+	insert into users (username, pass, fname, lname, email, age) values (u, p, f, l, e, a);
+    insert into usershobbies (u_id, h_id) values (last_insert_id(), 1);
+end //
+delimiter ;
+
+call add_user("arvid", "apa123", "Arvid", "Kellström", "arvon@outlook.com", 21);
+
+/*UPPGIFT 6
+deleteUser(id)
+Skapa en stored procedure för att ta bort en användare.
+*/
+drop procedure if exists delete_user;
+
+delimiter //
+create procedure delete_user(in i int)
+begin
+	delete from users where id=i;
+    delete from usershobbies where u_id=i;
+    delete from friends where u_id=i;
+end//
+delimiter ;
+
+call delete_user(8);
+
+
+/*UPPGIFT 7
+add_friendship(id_a, id_b)
+Vid lagring av nya vänner så måste det ligga två poster för att sambanden ska fungera.  
+Skriv en procedure som tar två användar-id och lagrar (id_a, id_b) och (id_b,id_a) i tabellen för Friends. 
+*/
+drop procedure if exists add_friendship;
+
+delimiter //
+create procedure add_friendship(in id_a int, in id_b int)
+begin
+	insert into friends (u_id, f_id) values (id_a, id_b);
+    insert into friends (u_id, f_id) values (id_b, id_a);
+end//
+delimiter ;
+
+call add_friendship(10, 2);
+
+/*UPPGIFT 8
+agecheck
+Gör triggers som innan insert och update kontrollerar att ålder på användare är 11 eller mer än 11. Om ålder är satt till mindre än 11 så ska ett meddelande skrivas ut.
+*/
+
+delimiter //
+create procedure agecheck(in a int)
+deterministic
+no sql
+begin
+	if a < 11 then
+		signal sqlstate '45000' set message_text = 'Du är för liten, pysen';
+    end if;
+end//
+delimiter ;
+
+delimiter //
+create trigger validate_age_insert
+before insert on users for each row
+begin
+	call agecheck(new.age);
+end//
+delimiter ;
+
+delimiter //
+create trigger validate_age_update
+before update on users for each row
+begin
+	call agecheck(new.age);
+end//
+delimiter ;
+
+update users set age = 7 where id=10;
+
+insert into users (username, pass, fname, lname, email, age) values ("Gabbe", "saab94", "Gabbe", "Nator", "gab98@outlook.com", 6);
+
+
+/*UPPGIFT 9
+greeting
+Gör en funktion som returnerar en hälsningsfras tillsammans med användarens förnamn (att använda vid t ex vid mailutskick). 
+Ska kunna köras i exempelvis SELECT email, greeting(fname) FROM users;
+*/
+drop function if exists greetings;
+
+delimiter //
+create function greetings (uname text)
+	returns text deterministic
+    begin
+		declare greet text;
+        set greet = concat('Hej, jag heter ', uname);
+        return greet;
+	end//
+delimiter ;
+
+select email, greetings(fname) from users;
+
+/*UPPGIFT 10
+suggest_friends(username)
+gör en procedure som för en användare ger en lista med som mest 3 st användare (username) som den inte är kompis men som någon av den användarens kompisar är kompis med. 
+*/
+drop function if exists name_to_id;
+
+delimiter //
+create function name_to_id(uname text)
+returns int deterministic
+	begin
+		declare userid int;
+        begin
+			select id into userid from users where username = uname;
+			return userid;
+		end;
+	end//
+delimiter ;
+
+drop procedure if exists suggest_friends;
+
+delimiter //
+create procedure suggest_friends(in uname text)
+begin
+	select c.username as suggested_friend from friends v1 
+    join friends v2 on v1.f_id = v2.u_id
+    join users a on a.id = v1.u_id
+	join users b on b.id = v1.f_id
+	join users c on c.id = v2.f_id
+    where v1.u_id = name_to_id(uname) and v2.f_id not in(select f_id from friends where u_id = name_to_id(uname)) and v2.f_id != name_to_id(uname) limit 3;
+end//
+delimiter ;
+
+call suggest_friends("arvid");
+
+
